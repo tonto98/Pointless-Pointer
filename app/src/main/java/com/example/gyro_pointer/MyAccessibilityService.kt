@@ -3,11 +3,12 @@ package com.example.gyro_pointer
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.content.Context
+import android.content.Intent
 import android.content.res.Resources
 import android.graphics.Path
 import android.graphics.PixelFormat
-import android.os.Binder
-import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -15,25 +16,26 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStreamReader
+import java.net.ServerSocket
 import java.util.*
-import android.content.Intent
-import androidx.core.content.ContextCompat.getSystemService
-import android.icu.lang.UCharacter.GraphemeClusterBreak.T
-import androidx.core.app.NotificationCompat.getExtras
-import androidx.core.content.ContextCompat.getSystemService
-import android.icu.lang.UCharacter.GraphemeClusterBreak.T
 
-
-
-
+val mainHandler = Handler(Looper.getMainLooper())
 
 
 private lateinit var mLayout: FrameLayout
 private lateinit var windowManager: WindowManager
 private lateinit var layoutParams: WindowManager.LayoutParams
 
+private var inputData: String? = null
+
 private val screenHeight: Int = Resources.getSystem().displayMetrics.heightPixels
 private val screenWidth: Int = Resources.getSystem().displayMetrics.widthPixels
+
+private var x: Float = 0F
+private var y: Float = 0F
 
 class MyAccessibilityService : AccessibilityService() {
 
@@ -68,17 +70,29 @@ class MyAccessibilityService : AccessibilityService() {
         }
 
         val btn: ImageButton = mLayout.findViewById(R.id.action_button)
-        btn.setOnClickListener{
+        btn.setOnClickListener {
             Log.i("MainService", " kliko san botun")
 //            val res: Boolean = dispatchGesture(createClick(5f,5f), callback, null) //bitno
 //            Log.i("MainService", "result:   " + res.toString())
 
-            movePointer()
+//            movePointer()
 
         }
+
+        startServer()
+
+        mainHandler.post(object : Runnable {
+            override fun run() {
+                Log.i("MainService", "uso u run")
+                Thread.sleep(1000)
+                movePointer(x,y)
+                mainHandler.postDelayed(this, 1000)
+            }
+        })
+
+
         //windowManager.removeView(mLayout)
     }
-
 
 
     override fun onAccessibilityEvent(p0: AccessibilityEvent?) {
@@ -91,7 +105,7 @@ class MyAccessibilityService : AccessibilityService() {
         var data = ""
         if (intent?.getExtras()?.containsKey("data")!!)
             data = intent.getStringExtra("data")
-            Log.i("MainService", data)
+        Log.i("MainService", data)
         return START_STICKY
     }
 
@@ -107,7 +121,7 @@ class MyAccessibilityService : AccessibilityService() {
         return clickBuilder.build()
     }
 
-    fun initPointer(){
+    private fun initPointer() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         mLayout = FrameLayout(this)
         layoutParams = WindowManager.LayoutParams()
@@ -117,7 +131,7 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParams.gravity = Gravity.START
-        layoutParams.x = (screenWidth/2)
+        layoutParams.x = (screenWidth / 2)
         layoutParams.y = 0
 
         val inflater = LayoutInflater.from(this)
@@ -127,17 +141,61 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    fun movePointer(){
+    private fun movePointerRand() {
 
         val x = Random().nextInt(screenWidth)
-        val y = Random().nextInt(screenHeight) - screenHeight/2
+        val y = Random().nextInt(screenHeight) - screenHeight / 2
 
         layoutParams.x = x
         layoutParams.y = y
 
         windowManager.updateViewLayout(mLayout, layoutParams)
 
+    }
 
+    private fun movePointer(x: Float, y: Float) {
+        Log.i("MainService", x.toString() + " " + y.toString())
+        val x = Random().nextInt(screenWidth)
+        val y = Random().nextInt(screenHeight) - screenHeight / 2
+
+        layoutParams.x = x
+        layoutParams.y = y
+
+        windowManager.updateViewLayout(mLayout, layoutParams)
+
+    }
+
+    private fun startServer(){
+        val thread = Thread(object : Runnable{
+            override fun run() {
+                try{
+                    Log.i("MainService", "uso u try")
+                    val sSocket = ServerSocket(9001)
+                    val s = sSocket.accept()
+
+                    var input: BufferedReader
+
+                    while (true){
+                        Log.i("MainService", "uso u while")
+                        input = BufferedReader(InputStreamReader(s.getInputStream()))
+                        inputData = input.readLine()
+                        Log.i("MainService", inputData)
+                        val command = inputData!!.split(" ")
+                        x = command[0].toFloat()
+                        y = command[1].toFloat()
+                        //movePointer()
+                    }
+
+                    //                    s.close()
+                    //                    sSocket.close()
+
+                }catch (e: IOException){
+                    Log.i("MainService", "uso u catch " + e.toString())
+                    e.printStackTrace()
+                }
+            }
+        })
+        thread.start()
     }
 
 
