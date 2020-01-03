@@ -34,8 +34,11 @@ private var inputData: String? = null
 private val screenHeight: Int = Resources.getSystem().displayMetrics.heightPixels
 private val screenWidth: Int = Resources.getSystem().displayMetrics.widthPixels
 
-private var x: Float = 0F
-private var y: Float = 0F
+private var roll: Float = 0F
+private var pitch: Float = 0F
+
+private var pointer = Pointer()
+
 
 class MyAccessibilityService : AccessibilityService() {
 
@@ -84,9 +87,11 @@ class MyAccessibilityService : AccessibilityService() {
         mainHandler.post(object : Runnable {
             override fun run() {
                 Log.i("MainService", "uso u run")
-                Thread.sleep(1000)
-                movePointer(x,y)
-                mainHandler.postDelayed(this, 1000)
+                //Thread.sleep(33)
+                pointer.translateCommands(roll, pitch)
+                movePointerRand(pointer)
+                //movePointer(roll,pitch)
+                mainHandler.postDelayed(this, 33)
             }
         })
 
@@ -141,13 +146,11 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    private fun movePointerRand() {
+    private fun movePointerRand(pointer: Pointer) {
 
-        val x = Random().nextInt(screenWidth)
-        val y = Random().nextInt(screenHeight) - screenHeight / 2
-
-        layoutParams.x = x
-        layoutParams.y = y
+        layoutParams.x = pointer.x
+        layoutParams.y = pointer.y
+        Log.i("MainService", pointer.x.toString() + " " + pointer.y.toString())
 
         windowManager.updateViewLayout(mLayout, layoutParams)
 
@@ -181,8 +184,8 @@ class MyAccessibilityService : AccessibilityService() {
                         inputData = input.readLine()
                         Log.i("MainService", inputData)
                         val command = inputData!!.split(" ")
-                        x = command[0].toFloat()
-                        y = command[1].toFloat()
+                        pitch = command[0].toFloat() //mozda obrnuto !!
+                        roll = command[1].toFloat() //mozda obrnuto !!
                         //movePointer()
                     }
 
