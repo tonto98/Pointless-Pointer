@@ -38,7 +38,9 @@ private var roll: Float = 0F
 private var pitch: Float = 0F
 
 private var pointer = Pointer()
+private var pointerLast = pointer.copy()
 
+private var clickTimer = 0
 
 class MyAccessibilityService : AccessibilityService() {
 
@@ -88,13 +90,23 @@ class MyAccessibilityService : AccessibilityService() {
             override fun run() {
                 Log.i("MainService", "uso u run")
                 //Thread.sleep(33)
+                pointerLast = pointer.copy()
                 pointer.translateCommands(roll, pitch)
-                movePointerRand(pointer)
+                movePointer(pointer)
+                if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
+                    clickTimer ++
+                    if (clickTimer == 90){
+                        clickTimer = 0
+                        val res: Boolean = dispatchGesture(createClick(pointer.x.toFloat()-1, pointer.y.toFloat()+ screenHeight/2 -1), callback, null) //bitno
+                        Log.i("MainService", "result:   " + res.toString())
+                    }
+                }else{
+                    clickTimer = 0
+                }
                 //movePointer(roll,pitch)
                 mainHandler.postDelayed(this, 33)
             }
         })
-
 
         //windowManager.removeView(mLayout)
     }
@@ -146,7 +158,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    private fun movePointerRand(pointer: Pointer) {
+    private fun movePointer(pointer: Pointer) {
 
         layoutParams.x = pointer.x
         layoutParams.y = pointer.y
@@ -156,7 +168,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     }
 
-    private fun movePointer(x: Float, y: Float) {
+    private fun movePointerRandom(x: Float, y: Float) {
         Log.i("MainService", x.toString() + " " + y.toString())
         val x = Random().nextInt(screenWidth)
         val y = Random().nextInt(screenHeight) - screenHeight / 2
