@@ -15,8 +15,8 @@ import android.view.LayoutInflater
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.ProgressBar
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -26,7 +26,8 @@ import java.util.*
 val mainHandler = Handler(Looper.getMainLooper())
 
 
-private lateinit var mLayout: FrameLayout
+private lateinit var mLayoutCursor: FrameLayout
+private lateinit var mLayoutProgress: FrameLayout
 private lateinit var windowManager: WindowManager
 private lateinit var layoutParams: WindowManager.LayoutParams
 
@@ -62,6 +63,7 @@ class MyAccessibilityService : AccessibilityService() {
 //        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
         initPointer()
+        initProgressBar()
 
         val callback = object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription) {
@@ -76,10 +78,11 @@ class MyAccessibilityService : AccessibilityService() {
         }
 
 
-        val cursorImg: ImageView = mLayout.findViewById(R.id.cursor_image)
+        val cursorImg: ImageView = mLayoutCursor.findViewById(R.id.cursor_image)
+        val progressBar: ProgressBar = mLayoutProgress.findViewById(R.id.progressBar)
 
 /*
-        val btn: ImageButton = mLayout.findViewById(R.id.action_button)
+        val btn: ImageButton = mLayoutCursor.findViewById(R.id.action_button)
         btn.setOnClickListener {
             Log.i("MainService", " kliko san botun")
 //            val res: Boolean = dispatchGesture(createClick(5f,5f), callback, null) //bitno
@@ -100,6 +103,7 @@ class MyAccessibilityService : AccessibilityService() {
                 movePointer(pointer)
                 if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
                     clickTimer ++
+                    progressBar.progress = clickTimer
                     if (clickTimer == 90){
                         clickTimer = 0
                         val res: Boolean = dispatchGesture(createClick(pointer.x.toFloat()-1, pointer.y.toFloat()+ screenHeight/2 -1), callback, null) //bitno
@@ -107,13 +111,14 @@ class MyAccessibilityService : AccessibilityService() {
                     }
                 }else{
                     clickTimer = 0
+                    progressBar.progress = 0
                 }
                 //movePointer(roll,pitch)
                 mainHandler.postDelayed(this, 33)
             }
         })
 
-        //windowManager.removeView(mLayout)
+        //windowManager.removeView(mLayoutCursor)
     }
 
 
@@ -145,7 +150,7 @@ class MyAccessibilityService : AccessibilityService() {
 
     private fun initPointer() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        mLayout = FrameLayout(this)
+        mLayoutCursor = FrameLayout(this)
         layoutParams = WindowManager.LayoutParams()
         layoutParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         layoutParams.format = PixelFormat.TRANSLUCENT
@@ -157,10 +162,28 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParams.y = 0
 
         val inflater = LayoutInflater.from(this)
-        inflater.inflate(R.layout.action, mLayout)
-        windowManager.addView(mLayout, layoutParams)
+        inflater.inflate(R.layout.cursor, mLayoutCursor)
+        windowManager.addView(mLayoutCursor, layoutParams)
 
 
+    }
+
+    private fun initProgressBar(){
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        mLayoutProgress = FrameLayout(this)
+        layoutParams = WindowManager.LayoutParams()
+        layoutParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        layoutParams.format = PixelFormat.TRANSLUCENT
+        layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParams.gravity = Gravity.START
+        layoutParams.x = 0
+        layoutParams.y = screenHeight/2
+
+        val inflater = LayoutInflater.from(this)
+        inflater.inflate(R.layout.progress_bar, mLayoutProgress)
+        windowManager.addView(mLayoutProgress, layoutParams)
     }
 
     private fun movePointer(pointer: Pointer) {
@@ -169,7 +192,7 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParams.y = pointer.y
         Log.i("MainService", pointer.x.toString() + " " + pointer.y.toString())
 
-        windowManager.updateViewLayout(mLayout, layoutParams)
+        windowManager.updateViewLayout(mLayoutCursor, layoutParams)
 
     }
 
@@ -181,7 +204,7 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParams.x = x
         layoutParams.y = y
 
-        windowManager.updateViewLayout(mLayout, layoutParams)
+        windowManager.updateViewLayout(mLayoutCursor, layoutParams)
 
     }
 
