@@ -1,18 +1,14 @@
 package com.example.gyro_pointer
 
-import android.content.Intent
-import android.content.ServiceConnection
-import androidx.appcompat.app.AppCompatActivity
-import android.os.Bundle
-import kotlinx.android.synthetic.main.activity_main.*
-import android.widget.Toast
-import android.os.IBinder
 import android.content.ComponentName
 import android.content.Context
-import androidx.core.app.ComponentActivity.ExtraData
-import androidx.core.content.ContextCompat.getSystemService
-import android.icu.lang.UCharacter.GraphemeClusterBreak.T
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.Bundle
+import android.os.IBinder
 import android.util.Log
+import androidx.appcompat.app.AppCompatActivity
+import kotlinx.android.synthetic.main.activity_main.*
 
 
 class MainActivity : AppCompatActivity() {
@@ -55,4 +51,6 @@ class MainActivity : AppCompatActivity() {
             Log.i("MainActivity", "Service Conncected")
         }
     }
+
+
 }

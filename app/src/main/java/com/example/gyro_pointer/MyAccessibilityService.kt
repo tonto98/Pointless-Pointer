@@ -16,6 +16,7 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
@@ -74,6 +75,10 @@ class MyAccessibilityService : AccessibilityService() {
             }
         }
 
+
+        val cursorImg: ImageView = mLayout.findViewById(R.id.cursor_image)
+
+/*
         val btn: ImageButton = mLayout.findViewById(R.id.action_button)
         btn.setOnClickListener {
             Log.i("MainService", " kliko san botun")
@@ -83,7 +88,7 @@ class MyAccessibilityService : AccessibilityService() {
 //            movePointer()
 
         }
-
+*/
         startServer()
 
         mainHandler.post(object : Runnable {
