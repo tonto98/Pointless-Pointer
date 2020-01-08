@@ -38,6 +38,22 @@ class MainActivity : AppCompatActivity() {
 
         }
 
+        switch_cursor_toggle.setOnClickListener {
+
+            if (switch_cursor_toggle.isChecked){
+                Log.i("MainActivity", "isActivated")
+                var intent = Intent(this, MyAccessibilityService::class.java)
+                intent.putExtra("toggle", "on")
+                startService(intent)
+            }else{
+                Log.i("MainActivity", "isDeactivated")
+                var intent = Intent(this, MyAccessibilityService::class.java)
+                intent.putExtra("toggle", "off")
+                startService(intent)
+            }
+
+        }
+
 
 
 

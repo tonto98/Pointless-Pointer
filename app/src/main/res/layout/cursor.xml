@@ -17,7 +17,7 @@
             android:id="@+id/cursor_image"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:src="@drawable/kursor_kursor_24"/>
+            android:src="@drawable/zeleni"/>
 
 
 </LinearLayout>

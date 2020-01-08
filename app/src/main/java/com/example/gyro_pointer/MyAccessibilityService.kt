@@ -12,6 +12,8 @@ import android.os.Looper
 import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.View.INVISIBLE
+import android.view.View.VISIBLE
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
@@ -29,7 +31,9 @@ val mainHandler = Handler(Looper.getMainLooper())
 private lateinit var mLayoutCursor: FrameLayout
 private lateinit var mLayoutProgress: FrameLayout
 private lateinit var windowManager: WindowManager
-private lateinit var layoutParams: WindowManager.LayoutParams
+private lateinit var layoutParamsCursor: WindowManager.LayoutParams
+private lateinit var layoutParamsProgress: WindowManager.LayoutParams
+
 
 private var inputData: String? = null
 
@@ -43,6 +47,8 @@ private var pointer = Pointer()
 private var pointerLast = pointer.copy()
 
 private var clickTimer = 0
+
+private var isCursorActivated: Boolean = false
 
 class MyAccessibilityService : AccessibilityService() {
 
@@ -100,7 +106,9 @@ class MyAccessibilityService : AccessibilityService() {
                 //Thread.sleep(33)
                 pointerLast = pointer.copy()
                 pointer.translateCommands(roll, pitch)
+
                 movePointer(pointer)
+
                 if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
                     clickTimer ++
                     progressBar.progress = clickTimer
@@ -130,9 +138,14 @@ class MyAccessibilityService : AccessibilityService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         var data = ""
-        if (intent?.getExtras()?.containsKey("data")!!)
-            data = intent.getStringExtra("data")
+        if (intent?.getExtras()?.containsKey("toggle")!!)
+            data = intent.getStringExtra("toggle")
         Log.i("MainService", data)
+        if (data == "on"){
+            showCursor()
+        }else if (data == "off"){
+            hideCursor()
+        }
         return START_STICKY
     }
 
@@ -151,48 +164,47 @@ class MyAccessibilityService : AccessibilityService() {
     private fun initPointer() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         mLayoutCursor = FrameLayout(this)
-        layoutParams = WindowManager.LayoutParams()
-        layoutParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        layoutParams.format = PixelFormat.TRANSLUCENT
-        layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-        layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
-        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
-        layoutParams.gravity = Gravity.START
-        layoutParams.x = (screenWidth / 2)
-        layoutParams.y = 0
+        layoutParamsCursor = WindowManager.LayoutParams()
+        layoutParamsCursor.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        layoutParamsCursor.format = PixelFormat.TRANSLUCENT
+        layoutParamsCursor.flags = layoutParamsCursor.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsCursor.width = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCursor.height = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCursor.gravity = Gravity.START
+        layoutParamsCursor.x = (screenWidth / 2)
+        layoutParamsCursor.y = 0
 
         val inflater = LayoutInflater.from(this)
         inflater.inflate(R.layout.cursor, mLayoutCursor)
-        windowManager.addView(mLayoutCursor, layoutParams)
-
+        windowManager.addView(mLayoutCursor, layoutParamsCursor)
 
     }
 
     private fun initProgressBar(){
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         mLayoutProgress = FrameLayout(this)
-        layoutParams = WindowManager.LayoutParams()
-        layoutParams.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        layoutParams.format = PixelFormat.TRANSLUCENT
-        layoutParams.flags = layoutParams.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-        layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT
-        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT
-        layoutParams.gravity = Gravity.START
-        layoutParams.x = 0
-        layoutParams.y = screenHeight/2
+        layoutParamsProgress = WindowManager.LayoutParams()
+        layoutParamsProgress.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        layoutParamsProgress.format = PixelFormat.TRANSLUCENT
+        layoutParamsProgress.flags = layoutParamsProgress.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsProgress.width = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsProgress.height = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsProgress.gravity = Gravity.START
+        layoutParamsProgress.x = 0
+        layoutParamsProgress.y = screenHeight/2
 
         val inflater = LayoutInflater.from(this)
         inflater.inflate(R.layout.progress_bar, mLayoutProgress)
-        windowManager.addView(mLayoutProgress, layoutParams)
+        windowManager.addView(mLayoutProgress, layoutParamsProgress)
     }
 
     private fun movePointer(pointer: Pointer) {
 
-        layoutParams.x = pointer.x
-        layoutParams.y = pointer.y
+        layoutParamsCursor.x = pointer.x
+        layoutParamsCursor.y = pointer.y
         Log.i("MainService", pointer.x.toString() + " " + pointer.y.toString())
 
-        windowManager.updateViewLayout(mLayoutCursor, layoutParams)
+        windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
 
     }
 
@@ -201,10 +213,10 @@ class MyAccessibilityService : AccessibilityService() {
         val x = Random().nextInt(screenWidth)
         val y = Random().nextInt(screenHeight) - screenHeight / 2
 
-        layoutParams.x = x
-        layoutParams.y = y
+        layoutParamsCursor.x = x
+        layoutParamsCursor.y = y
 
-        windowManager.updateViewLayout(mLayoutCursor, layoutParams)
+        windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
 
     }
 
@@ -241,6 +253,21 @@ class MyAccessibilityService : AccessibilityService() {
         thread.start()
     }
 
+    fun showCursor(){
+        mLayoutCursor.visibility = VISIBLE
+        windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
+
+        mLayoutProgress.visibility = VISIBLE
+        windowManager.updateViewLayout(mLayoutProgress, layoutParamsProgress)
+    }
+
+    fun hideCursor(){
+        mLayoutCursor.visibility = INVISIBLE
+        windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
+
+        mLayoutProgress.visibility = INVISIBLE
+        windowManager.updateViewLayout(mLayoutProgress, layoutParamsProgress)
+    }
 
 }
 
