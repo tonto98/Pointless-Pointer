@@ -104,24 +104,30 @@ class MyAccessibilityService : AccessibilityService() {
             override fun run() {
                 Log.i("MainService", "uso u run")
                 //Thread.sleep(33)
-                pointerLast = pointer.copy()
-                pointer.translateCommands(roll, pitch)
+                if(isCursorActivated){
+                    pointerLast = pointer.copy()
+                    pointer.translateCommands(roll, pitch)
 
-                movePointer(pointer)
+                    movePointer(pointer)
 
-                if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
-                    clickTimer ++
-                    progressBar.progress = clickTimer
-                    if (clickTimer == 90){
+                    if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
+                        clickTimer ++
+                        progressBar.progress = clickTimer
+                        if (clickTimer == 90){
+                            clickTimer = 0
+                            val res: Boolean = dispatchGesture(createClick(pointer.x.toFloat()-1, pointer.y.toFloat()+ screenHeight/2 -1), callback, null) //bitno
+                            Log.i("MainService", "result:   " + res.toString())
+                        }
+                    }else{
                         clickTimer = 0
-                        val res: Boolean = dispatchGesture(createClick(pointer.x.toFloat()-1, pointer.y.toFloat()+ screenHeight/2 -1), callback, null) //bitno
-                        Log.i("MainService", "result:   " + res.toString())
+                        progressBar.progress = 0
                     }
+                    //movePointer(roll,pitch)
                 }else{
                     clickTimer = 0
                     progressBar.progress = 0
                 }
-                //movePointer(roll,pitch)
+
                 mainHandler.postDelayed(this, 33)
             }
         })
@@ -142,8 +148,10 @@ class MyAccessibilityService : AccessibilityService() {
             data = intent.getStringExtra("toggle")
         Log.i("MainService", data)
         if (data == "on"){
+            isCursorActivated = true
             showCursor()
         }else if (data == "off"){
+            isCursorActivated = false
             hideCursor()
         }
         return START_STICKY
@@ -173,6 +181,7 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParamsCursor.gravity = Gravity.START
         layoutParamsCursor.x = (screenWidth / 2)
         layoutParamsCursor.y = 0
+        mLayoutCursor.visibility = INVISIBLE
 
         val inflater = LayoutInflater.from(this)
         inflater.inflate(R.layout.cursor, mLayoutCursor)
@@ -192,6 +201,7 @@ class MyAccessibilityService : AccessibilityService() {
         layoutParamsProgress.gravity = Gravity.START
         layoutParamsProgress.x = 0
         layoutParamsProgress.y = screenHeight/2
+        mLayoutProgress.visibility = INVISIBLE
 
         val inflater = LayoutInflater.from(this)
         inflater.inflate(R.layout.progress_bar, mLayoutProgress)

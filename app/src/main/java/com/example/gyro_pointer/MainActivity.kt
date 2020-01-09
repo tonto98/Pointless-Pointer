@@ -19,14 +19,14 @@ class MainActivity : AppCompatActivity() {
         bindService(Intent(this, MyAccessibilityService::class.java), mConnection, Context.BIND_AUTO_CREATE)
         // check for service permission
         button_service_start.setOnClickListener {
-//            var intent = Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
-//            startActivityForResult(intent, 0)
+            var intent = Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivityForResult(intent, 0)
 
 
 
-            var intent = Intent(this, MyAccessibilityService::class.java)
-            intent.putExtra("data", "dataaaa")
-            startService(intent)
+//            var intent = Intent(this, MyAccessibilityService::class.java)
+//            intent.putExtra("data", "dataaaa")
+//            startService(intent)
 
             
 
