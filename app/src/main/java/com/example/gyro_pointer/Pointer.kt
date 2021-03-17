@@ -12,6 +12,7 @@ class Pointer(x: Int = 5, y: Int = 5) {
     var x = x
     var y = y
 
+    // this code is dumb, please fix later moron
     fun translateCommands( roll: Float, pitch: Float){
         if (roll < (-1.5) && roll > (-3.5)){
             if (x > 5){
