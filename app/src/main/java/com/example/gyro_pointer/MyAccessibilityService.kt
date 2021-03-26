@@ -7,10 +7,10 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
-import android.graphics.Path
-import android.graphics.PixelFormat
-import android.graphics.SurfaceTexture
+import android.graphics.*
+import android.graphics.BitmapFactory.decodeByteArray
 import android.hardware.*
+import android.hardware.Camera
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -19,6 +19,7 @@ import android.view.View.INVISIBLE
 import android.view.View.VISIBLE
 import android.view.accessibility.AccessibilityEvent
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.ProgressBar
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -31,27 +32,53 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetector
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
 import java.net.ServerSocket
+import java.sql.Time
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
 
 typealias faceOrientationListener = (faceOrientation: FaceOrientation) -> Unit
 
-class MyAccessibilityService : AccessibilityService(), SensorEventListener, Camera.PictureCallback, SurfaceHolder.Callback {
+class MyAccessibilityService : AccessibilityService(), SensorEventListener, Camera.PictureCallback,
+    SurfaceHolder.Callback {
+
+    companion object {
+        private const val TAG = "CameraXBasic"
+        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+
+        private var mServiceCamera: Camera? = null
+    }
 
     // todo use mainLooper
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainThreadHandler = Handler(Looper.getMainLooper())
+    private val backgroundThreadHandler = Executors.newSingleThreadExecutor()
+
+    init {
+        mainThreadHandler.post {
+            // ovo na main threadu
+        }
+
+        backgroundThreadHandler.submit {
+            // ovo se na main threadu izvrsava
+        }
+    }
+
+    fun runOnMainThread(runnable: Runnable) {
+        mainThreadHandler.post(runnable)
+    }
 
     private lateinit var mLayoutCursor: FrameLayout
     private lateinit var mLayoutProgress: FrameLayout
+    private lateinit var mLayoutCameraView: FrameLayout
     private lateinit var windowManager: WindowManager
     private lateinit var layoutParamsCursor: WindowManager.LayoutParams
     private lateinit var layoutParamsProgress: WindowManager.LayoutParams
+    private lateinit var layoutParamsCameraView: WindowManager.LayoutParams
 
     private var inputData: String? = null
 
@@ -82,6 +109,11 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
     private var mCamera: Camera? = null
 
+    private var mSurfaceView: SurfaceView? = null
+    private var mSurfaceHolder: SurfaceHolder? = null
+
+    private var cameraImageView: ImageView? = null
+
     override fun onInterrupt() {
         Log.i("vito_log", "onInterrupt() called")
     }
@@ -91,7 +123,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         super.onCreate()
     }
 
-    override fun onServiceConnected() {
+    private fun initShit() {
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         mLight = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
 
@@ -104,28 +136,124 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         initPointer()
         initProgressBar()
+        initCameraView()
 
         progressBar = mLayoutProgress.findViewById(R.id.progressBar)
 
         startPointer()
 
         detector = FaceDetection.getClient(FaceDetectorOptions.Builder().build())
+    }
 
-        openCamera()
+    override fun onServiceConnected() {
+        Log.d("vito_log", "onServiceConnected")
+        initShit()
 
-        backgroundThreadScheduler.scheduleAtFixedRate({
-            // todo uncomment me to take pictures
+        // TODO mCamera is old camera, mServiceCamera is new camera
+//        openMCamera()
+//        openMServiceCamera()
+
+//        backgroundThreadScheduler.scheduleAtFixedRate({
+//            // todo uncomment me to take pictures
 //            takePicture()
-        }, 0, 1000, TimeUnit.MILLISECONDS)
+//        }, 0, 1000, TimeUnit.MILLISECONDS)
 
 
         // https://developer.android.com/reference/android/hardware/Camera.html#setPreviewCallback(android.hardware.Camera.PreviewCallback)
         // https://stackoverflow.com/questions/35987346/getting-the-raw-camera-data-on-android
-
-
-//        backgroundThreadScheduler.schedule({ takePicture() }, 0, TimeUnit.MILLISECONDS)
     }
 
+    private fun openMServiceCamera() {
+
+        val params = mServiceCamera?.parameters
+        mServiceCamera?.parameters = params
+
+        val p = mServiceCamera?.parameters
+
+        val listSize = p?.supportedPreviewSizes
+        val mPreviewSize = listSize!![2]
+
+        p.setPreviewSize(mPreviewSize.width, mPreviewSize.height)
+        p.previewFormat = PixelFormat.YCbCr_420_SP
+        mServiceCamera?.parameters = p
+
+        try {
+            mServiceCamera?.setDisplayOrientation(90)
+            mServiceCamera?.setPreviewDisplay(mSurfaceHolder)
+            mServiceCamera?.startPreview()
+
+            Log.d("vito_log", "started preview very good")
+
+            mServiceCamera?.setPreviewCallback { data, camera ->
+                Log.d("vito_log", "got camera data, size: ${data.size}")
+
+                if(data == null || data.isEmpty()) {
+                    throw java.lang.RuntimeException()
+                }
+
+//                val img: Bitmap? = decodeByteArray(data, 0, data.size)
+
+                /*
+                YuvImage yuv = new YuvImage(data, parameters.getPreviewFormat(), width, height, null);
+
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                yuv.compressToJpeg(new Rect(0, 0, width, height), 50, out);
+
+                byte[] bytes = out.toByteArray();
+                final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                * */
+                val aprams = camera.parameters
+                val iwdth = aprams.previewSize.width
+                val ehight = aprams.previewSize.height
+
+                val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
+                val out = ByteArrayOutputStream()
+                yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
+
+                val bytes = out.toByteArray()
+
+                val img = decodeByteArray(bytes, 0, bytes.size)
+
+                cameraImageView?.setImageBitmap(img)
+
+                if(img != null) {
+
+                    Log.i("FACE", img.toString())
+                    val image = InputImage.fromBitmap(img, 0)
+                    Log.i("FACE", image.height.toString() + image.width.toString())
+                    Log.i("FACE", image.toString())
+                    val result = detector.process(image)
+                        .addOnSuccessListener { faces ->
+
+                            Log.d("FACE", faces.size.toString())
+                            if(faces.size > 0){
+//                    listener(FaceOrientation(faces[0].headEulerAngleY, faces[0].headEulerAngleZ))
+
+                                // https://developers.google.com/ml-kit/vision/face-detection/android
+
+                                Log.d("vito_log", "more than 0 faces")
+                            } else {
+                                Log.d("vito_log", "<= 0 faces")
+                            }
+//                        faces[0].headEulerAngleY
+
+                        }
+                        .addOnFailureListener { e ->
+                            // Task failed with an exception
+                            // ...
+                            Log.d("FACE", "error boy: $e")
+                        }
+                } else {
+                    Log.d("vito_log", "cant decode image")
+                }
+            }
+        } catch (throwable: Throwable) {
+            Log.d("vito_log", "error starting preview, setting preview callback")
+        }
+
+        // TODO try this, use reconnect to reclaim camera, check docs
+//        mServiceCamera?.unlock()
+    }
 
 
     private fun takePicture() {
@@ -154,12 +282,11 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 //            sHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
 
         } catch (e: Throwable) {
-            mainHandler.post {
+            mainThreadHandler.post {
                 Log.d("vito_log", "error on camera and surface view thingy: $e")
             }
         }
     }
-
 
 
     private fun startPointer() {
@@ -178,27 +305,32 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         backgroundThreadScheduler.scheduleAtFixedRate({
             // TODO can this execute on background thread?
-            mainHandler.post {
+            mainThreadHandler.post {
 //                Log.i("vito_log", "uso u run")
-                if(isCursorActivated){
+                if (isCursorActivated) {
                     pointerLast = pointer.copy()
                     pointer.translateCommands(roll, pitch)
 
                     movePointer(pointer)
 
-                    if (pointer.x == pointerLast.x && pointer.y == pointerLast.y){
+                    if (pointer.x == pointerLast.x && pointer.y == pointerLast.y) {
                         clickTimer += 2
                         progressBar.progress = clickTimer
-                        if (clickTimer == 90){
+                        if (clickTimer == 90) {
                             clickTimer = 0
-                            val res: Boolean = dispatchGesture(createClick(pointer.x.toFloat()-1, pointer.y.toFloat()+ screenHeight/2 -1), callback, null) //bitno
+                            val res: Boolean = dispatchGesture(
+                                createClick(
+                                    pointer.x.toFloat() - 1,
+                                    pointer.y.toFloat() + screenHeight / 2 - 1
+                                ), callback, null
+                            ) //bitno
                             Log.i("vito_log", "result:   " + res.toString())
                         }
-                    }else{
+                    } else {
                         clickTimer = 0
                         progressBar.progress = 0
                     }
-                }else{
+                } else {
                     clickTimer = 0
                     progressBar.progress = 0
                 }
@@ -206,7 +338,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         }, 0, 30L, TimeUnit.MILLISECONDS)
     }
 
-    private fun openCamera() {
+    private fun openMCamera() {
         mCamera = getAvailableFrontCamera() // globally declared instance of camera
         if (mCamera == null) {
             try {
@@ -291,18 +423,15 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
     // TODO -------------------------------------------------------------------------------------
 
-    companion object {
-        private const val TAG = "CameraXBasic"
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
-    }
-
-    private class YourImageAnalyzer(private val listener: faceOrientationListener) : ImageAnalysis.Analyzer {
+    private class YourImageAnalyzer(private val listener: faceOrientationListener) :
+        ImageAnalysis.Analyzer {
 
         @SuppressLint("UnsafeExperimentalUsageError")
         override fun analyze(imageProxy: ImageProxy) {
             val mediaImage = imageProxy.image
             if (mediaImage != null) {
-                val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                val image =
+                    InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                 // Pass image to an ML Kit Vision API
                 // ...
                 val detector = FaceDetection.getClient(FaceDetectorOptions.Builder().build())
@@ -311,8 +440,13 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                         // Task completed successfully
                         // ...
                         Log.d("FACE", faces.size.toString())
-                        if(faces.size > 0){
-                            listener(FaceOrientation(faces[0].headEulerAngleY, faces[0].headEulerAngleZ))
+                        if (faces.size > 0) {
+                            listener(
+                                FaceOrientation(
+                                    faces[0].headEulerAngleY,
+                                    faces[0].headEulerAngleZ
+                                )
+                            )
                         }
 //                        faces[0].headEulerAngleY
 
@@ -324,7 +458,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                     }
                     .addOnCompleteListener {
                         mediaImage.close()
-                        imageProxy.close() }
+                        imageProxy.close()
+                    }
 
 
             }
@@ -354,8 +489,11 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 //                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
 //                        Log.d(TAG, "Average luminosity: $luma")
 //                    })
-                    it.setAnalyzer(cameraExecutor, YourImageAnalyzer{faceOrientation ->
-                        Log.d("AAAAAAA", "penis1: ${faceOrientation.orientationY}  penis2: ${faceOrientation.orientationZ}")
+                    it.setAnalyzer(cameraExecutor, YourImageAnalyzer { faceOrientation ->
+                        Log.d(
+                            "AAAAAAA",
+                            "penis1: ${faceOrientation.orientationY}  penis2: ${faceOrientation.orientationZ}"
+                        )
                     })
                 }
 
@@ -372,14 +510,12 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                 cameraProvider.bindToLifecycle(
                     this, cameraSelector, preview, imageCapture, imageAnalyzer)
 */
-            } catch(exc: Exception) {
+            } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
-
-
 
 
     override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
@@ -399,7 +535,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     }
 
 
-
     override fun onAccessibilityEvent(p0: AccessibilityEvent?) {
         Log.i("MainService", "onAccessibilityEvent() called")
         //TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
@@ -409,12 +544,12 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         super.onStartCommand(intent, flags, startId)
         var data = ""
         if (intent?.getExtras()?.containsKey("toggle")!!)
-            data = intent.getStringExtra("toggle")
+            data = intent.getStringExtra("toggle")!!
         Log.i("MainService", data)
-        if (data == "on"){
+        if (data == "on") {
             isCursorActivated = true
             showCursor()
-        }else if (data == "off"){
+        } else if (data == "off") {
             isCursorActivated = false
             hideCursor()
         }
@@ -439,7 +574,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         layoutParamsCursor = WindowManager.LayoutParams()
         layoutParamsCursor.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         layoutParamsCursor.format = PixelFormat.TRANSLUCENT
-        layoutParamsCursor.flags = layoutParamsCursor.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsCursor.flags =
+            layoutParamsCursor.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         layoutParamsCursor.width = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsCursor.height = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsCursor.gravity = Gravity.START
@@ -450,21 +586,21 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         val inflater = LayoutInflater.from(this)
         inflater.inflate(R.layout.cursor, mLayoutCursor)
         windowManager.addView(mLayoutCursor, layoutParamsCursor)
-
     }
 
-    private fun initProgressBar(){
+    private fun initProgressBar() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         mLayoutProgress = FrameLayout(this)
         layoutParamsProgress = WindowManager.LayoutParams()
         layoutParamsProgress.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         layoutParamsProgress.format = PixelFormat.TRANSLUCENT
-        layoutParamsProgress.flags = layoutParamsProgress.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsProgress.flags =
+            layoutParamsProgress.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
         layoutParamsProgress.width = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsProgress.height = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsProgress.gravity = Gravity.START
         layoutParamsProgress.x = 0
-        layoutParamsProgress.y = screenHeight/2
+        layoutParamsProgress.y = screenHeight / 2
         mLayoutProgress.visibility = INVISIBLE
 
         val inflater = LayoutInflater.from(this)
@@ -472,11 +608,32 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         windowManager.addView(mLayoutProgress, layoutParamsProgress)
     }
 
+    private fun initCameraView() {
+
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        mLayoutCameraView = FrameLayout(this)
+        layoutParamsCameraView = WindowManager.LayoutParams()
+        layoutParamsCameraView.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        layoutParamsCameraView.format = PixelFormat.TRANSLUCENT
+        layoutParamsCameraView.flags =
+            layoutParamsCameraView.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsCameraView.width = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCameraView.height = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCameraView.gravity = Gravity.START
+        layoutParamsCameraView.x = 0
+        layoutParamsCameraView.y = screenHeight / 2
+        mLayoutCameraView.visibility = INVISIBLE
+
+        val inflater = LayoutInflater.from(this)
+        inflater.inflate(R.layout.camera_view, mLayoutCameraView)
+        windowManager.addView(mLayoutCameraView, layoutParamsCameraView)
+    }
+
     private fun movePointer(pointer: Pointer) {
 
         layoutParamsCursor.x = pointer.x
         layoutParamsCursor.y = pointer.y
-        Log.i("MainService", pointer.x.toString() + " " + pointer.y.toString())
+//        Log.i("MainService", pointer.x.toString() + " " + pointer.y.toString())
 
         windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
 
@@ -494,17 +651,17 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
     }
 
-    private fun startServer(){
-        val thread = Thread(object : Runnable{
+    private fun startServer() {
+        val thread = Thread(object : Runnable {
             override fun run() {
-                try{
+                try {
                     Log.i("MainService", "uso u try")
                     val sSocket = ServerSocket(9001)
                     val s = sSocket.accept()
 
                     var input: BufferedReader
 
-                    while (true){
+                    while (true) {
                         Log.i("MainService", "uso u while")
                         input = BufferedReader(InputStreamReader(s.getInputStream()))
                         inputData = input.readLine()
@@ -518,7 +675,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                     //                    s.close()
                     //                    sSocket.close()
 
-                }catch (e: IOException){
+                } catch (e: IOException) {
                     Log.i("MainService", "uso u catch " + e.toString())
                     e.printStackTrace()
                 }
@@ -527,20 +684,45 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         thread.start()
     }
 
-    fun showCursor(){
+    private fun showCursor() {
         mLayoutCursor.visibility = VISIBLE
         windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
 
         mLayoutProgress.visibility = VISIBLE
         windowManager.updateViewLayout(mLayoutProgress, layoutParamsProgress)
+
+        mLayoutCameraView.visibility = VISIBLE
+        windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
+
+        mainThreadHandler.post {
+            mServiceCamera = Camera.open()
+//            mServiceCamera = getAvailableFrontCamera()
+            mSurfaceView = mLayoutCameraView.findViewById(R.id.camera_view_surface_view)
+            cameraImageView = mLayoutCameraView.findViewById(R.id.camera_view_image_view)
+            mSurfaceHolder = mSurfaceView?.holder
+            mSurfaceHolder?.addCallback(this)
+            mSurfaceHolder?.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
+
+            mLayoutCameraView.visibility = VISIBLE
+            windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
+
+            openMServiceCamera()
+
+            // FRONT CAMERA NOT WORKING WITH ML KIT ALSO I HAVE SERIOUS DEPRESSION
+            // https://stackoverflow.com/questions/63050697/mlkit-face-detection-not-working-with-front-camera-for-android
+        }
     }
 
-    fun hideCursor(){
+    private fun hideCursor() {
         mLayoutCursor.visibility = INVISIBLE
         windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
 
         mLayoutProgress.visibility = INVISIBLE
         windowManager.updateViewLayout(mLayoutProgress, layoutParamsProgress)
+
+        mLayoutCameraView.visibility = INVISIBLE
+        windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
+        mServiceCamera?.release()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
@@ -556,8 +738,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     }
 
 }
-
-
 
 
 // vito prvi pokusaj
@@ -1180,7 +1360,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
  */
 
 
-
 // prije vita
 /*
 
@@ -1630,3 +1809,4 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Life
 }
 
 */
+
