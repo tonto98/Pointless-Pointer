@@ -58,6 +58,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     private val mainThreadHandler = Handler(Looper.getMainLooper())
     private val backgroundThreadHandler = Executors.newSingleThreadExecutor()
 
+
+    // this is an example
     init {
         mainThreadHandler.post {
             // ovo na main threadu
@@ -163,6 +165,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         // https://stackoverflow.com/questions/35987346/getting-the-raw-camera-data-on-android
     }
 
+    var frameCount = 0
     private fun openMServiceCamera() {
 
         val params = mServiceCamera?.parameters
@@ -178,74 +181,81 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         mServiceCamera?.parameters = p
 
         try {
-            mServiceCamera?.setDisplayOrientation(90)
+            mServiceCamera?.setDisplayOrientation(180)
             mServiceCamera?.setPreviewDisplay(mSurfaceHolder)
             mServiceCamera?.startPreview()
 
             Log.d("vito_log", "started preview very good")
 
             mServiceCamera?.setPreviewCallback { data, camera ->
-                Log.d("vito_log", "got camera data, size: ${data.size}")
+                frameCount++
+                if (frameCount >= 5){
+                    Log.d("vito_log", "got camera data, size: ${data.size}")
+                    frameCount = 0
 
-                if(data == null || data.isEmpty()) {
-                    throw java.lang.RuntimeException()
-                }
+                    if(data == null || data.isEmpty()) {
+                        throw java.lang.RuntimeException()
+                    }
 
 //                val img: Bitmap? = decodeByteArray(data, 0, data.size)
 
-                /*
-                YuvImage yuv = new YuvImage(data, parameters.getPreviewFormat(), width, height, null);
+                    /*
+                    YuvImage yuv = new YuvImage(data, parameters.getPreviewFormat(), width, height, null);
 
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                yuv.compressToJpeg(new Rect(0, 0, width, height), 50, out);
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    yuv.compressToJpeg(new Rect(0, 0, width, height), 50, out);
 
-                byte[] bytes = out.toByteArray();
-                final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                * */
-                val aprams = camera.parameters
-                val iwdth = aprams.previewSize.width
-                val ehight = aprams.previewSize.height
+                    byte[] bytes = out.toByteArray();
+                    final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                    * */
+                    val aprams = camera.parameters
+                    val iwdth = aprams.previewSize.width
+                    val ehight = aprams.previewSize.height
 
-                val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
-                val out = ByteArrayOutputStream()
-                yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
+                    val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
+                    val out = ByteArrayOutputStream()
+                    yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
 
-                val bytes = out.toByteArray()
+                    val bytes = out.toByteArray()
 
-                val img = decodeByteArray(bytes, 0, bytes.size)
+                    val img = decodeByteArray(bytes, 0, bytes.size)
 
-                cameraImageView?.setImageBitmap(img)
+                    cameraImageView?.setImageBitmap(img)
 
-                if(img != null) {
+                    if(img != null) {
 
-                    Log.i("FACE", img.toString())
-                    val image = InputImage.fromBitmap(img, 0)
-                    Log.i("FACE", image.height.toString() + image.width.toString())
-                    Log.i("FACE", image.toString())
-                    val result = detector.process(image)
-                        .addOnSuccessListener { faces ->
+                        Log.i("FACE", img.toString())
+                        val image = InputImage.fromBitmap(img, 0)
+                        Log.i("FACE", image.height.toString() + image.width.toString())
+                        Log.i("FACE", image.toString())
+                        val result = detector.process(image)
+                            .addOnSuccessListener { faces ->
 
-                            Log.d("FACE", faces.size.toString())
-                            if(faces.size > 0){
+                                Log.d("FACE", faces.size.toString())
+                                if(faces.size > 0){
 //                    listener(FaceOrientation(faces[0].headEulerAngleY, faces[0].headEulerAngleZ))
 
-                                // https://developers.google.com/ml-kit/vision/face-detection/android
+                                    // https://developers.google.com/ml-kit/vision/face-detection/android
 
-                                Log.d("vito_log", "more than 0 faces")
-                            } else {
-                                Log.d("vito_log", "<= 0 faces")
-                            }
+                                    Log.d("vito_log", "more than 0 faces")
+                                } else {
+                                    Log.d("vito_log", "<= 0 faces")
+                                }
 //                        faces[0].headEulerAngleY
 
-                        }
-                        .addOnFailureListener { e ->
-                            // Task failed with an exception
-                            // ...
-                            Log.d("FACE", "error boy: $e")
-                        }
-                } else {
-                    Log.d("vito_log", "cant decode image")
+                            }
+                            .addOnFailureListener { e ->
+                                // Task failed with an exception
+                                // ...
+                                Log.d("FACE", "error boy: $e")
+                            }
+                    } else {
+                        Log.d("vito_log", "cant decode image")
+                    }
+                }else{
+//                    Log.d("vito_log", frameCount.toString())
                 }
+
             }
         } catch (throwable: Throwable) {
             Log.d("vito_log", "error starting preview, setting preview callback")
