@@ -74,6 +74,10 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         mainThreadHandler.post(runnable)
     }
 
+    fun runOnBackgroundThread(runnable: Runnable){
+        backgroundThreadHandler.submit(runnable)
+    }
+
     private lateinit var mLayoutCursor: FrameLayout
     private lateinit var mLayoutProgress: FrameLayout
     private lateinit var mLayoutCameraView: FrameLayout
@@ -114,7 +118,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     private var mSurfaceView: SurfaceView? = null
     private var mSurfaceHolder: SurfaceHolder? = null
 
-    private var cameraImageView: ImageView? = null
+    //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
+//    private var cameraImageView: ImageView? = null
 
     override fun onInterrupt() {
         Log.i("vito_log", "onInterrupt() called")
@@ -165,7 +170,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         // https://stackoverflow.com/questions/35987346/getting-the-raw-camera-data-on-android
     }
 
-    var frameCount = 0
+    var frameCount = 0 // maybe smort
+    var readyToProcessNextFrame = true
     private fun openMServiceCamera() {
 
         val params = mServiceCamera?.parameters
@@ -181,33 +187,23 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         mServiceCamera?.parameters = p
 
         try {
-            mServiceCamera?.setDisplayOrientation(180)
+            mServiceCamera?.setDisplayOrientation(0)
             mServiceCamera?.setPreviewDisplay(mSurfaceHolder)
             mServiceCamera?.startPreview()
 
             Log.d("vito_log", "started preview very good")
 
             mServiceCamera?.setPreviewCallback { data, camera ->
-                frameCount++
-                if (frameCount >= 5){
+                frameCount++ // fuck you frame count
+                if(readyToProcessNextFrame){    //if (frameCount >= 10){ // the IF
                     Log.d("vito_log", "got camera data, size: ${data.size}")
+                    readyToProcessNextFrame = false
                     frameCount = 0
 
                     if(data == null || data.isEmpty()) {
                         throw java.lang.RuntimeException()
                     }
 
-//                val img: Bitmap? = decodeByteArray(data, 0, data.size)
-
-                    /*
-                    YuvImage yuv = new YuvImage(data, parameters.getPreviewFormat(), width, height, null);
-
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    yuv.compressToJpeg(new Rect(0, 0, width, height), 50, out);
-
-                    byte[] bytes = out.toByteArray();
-                    final Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-                    * */
                     val aprams = camera.parameters
                     val iwdth = aprams.previewSize.width
                     val ehight = aprams.previewSize.height
@@ -220,7 +216,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
                     val img = decodeByteArray(bytes, 0, bytes.size)
 
-                    cameraImageView?.setImageBitmap(img)
+                    //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
+//                    cameraImageView?.setImageBitmap(img)
 
                     if(img != null) {
 
@@ -228,7 +225,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                         val image = InputImage.fromBitmap(img, 0)
                         Log.i("FACE", image.height.toString() + image.width.toString())
                         Log.i("FACE", image.toString())
-                        val result = detector.process(image)
+                        var res = detector.process(image)
                             .addOnSuccessListener { faces ->
 
                                 Log.d("FACE", faces.size.toString())
@@ -238,23 +235,22 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                                     // https://developers.google.com/ml-kit/vision/face-detection/android
 
                                     Log.d("vito_log", "more than 0 faces")
+                                    readyToProcessNextFrame = true
                                 } else {
                                     Log.d("vito_log", "<= 0 faces")
+                                    readyToProcessNextFrame = true
                                 }
 //                        faces[0].headEulerAngleY
 
                             }
                             .addOnFailureListener { e ->
-                                // Task failed with an exception
-                                // ...
                                 Log.d("FACE", "error boy: $e")
                             }
                     } else {
                         Log.d("vito_log", "cant decode image")
                     }
-                }else{
-//                    Log.d("vito_log", frameCount.toString())
-                }
+
+                } // the if for the frame count
 
             }
         } catch (throwable: Throwable) {
@@ -266,6 +262,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     }
 
 
+    // unused
     private fun takePicture() {
         try {
 //            val sv = SurfaceView(applicationContext)
@@ -348,6 +345,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         }, 0, 30L, TimeUnit.MILLISECONDS)
     }
 
+    // unused
     private fun openMCamera() {
         mCamera = getAvailableFrontCamera() // globally declared instance of camera
         if (mCamera == null) {
@@ -379,6 +377,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         }
     }
 
+
+    // unused
     override fun onPictureTaken(data: ByteArray?, camera: Camera?) {
         safeToCapture = false
 
@@ -410,6 +410,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         safeToCapture = true //Set a boolean to true again after saving file.
     }
 
+
     private fun getAvailableFrontCamera(): Camera? {
         var cameraCount = 0
         var cam: Camera? = null
@@ -431,8 +432,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         return cam
     }
 
-    // TODO -------------------------------------------------------------------------------------
-
+    // unused
     private class YourImageAnalyzer(private val listener: faceOrientationListener) :
         ImageAnalysis.Analyzer {
 
@@ -475,7 +475,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
             }
         }
     }
-
+    // unused
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -705,10 +705,13 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
 
         mainThreadHandler.post {
-            mServiceCamera = Camera.open()
-//            mServiceCamera = getAvailableFrontCamera()
+//            mServiceCamera = Camera.open()
+            mServiceCamera = getAvailableFrontCamera()
             mSurfaceView = mLayoutCameraView.findViewById(R.id.camera_view_surface_view)
-            cameraImageView = mLayoutCameraView.findViewById(R.id.camera_view_image_view)
+
+            //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
+            //cameraImageView = mLayoutCameraView.findViewById(R.id.camera_view_image_view)
+
             mSurfaceHolder = mSurfaceView?.holder
             mSurfaceHolder?.addCallback(this)
             mSurfaceHolder?.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS)
