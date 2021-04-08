@@ -119,7 +119,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     private var mSurfaceHolder: SurfaceHolder? = null
 
     //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
-//    private var cameraImageView: ImageView? = null
+    //private var cameraImageView: ImageView? = null
 
     override fun onInterrupt() {
         Log.i("vito_log", "onInterrupt() called")
@@ -178,77 +178,96 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         mServiceCamera?.parameters = params
 
         val p = mServiceCamera?.parameters
-
         val listSize = p?.supportedPreviewSizes
-        val mPreviewSize = listSize!![2]
+        val mPreviewSize = listSize!![15]
+
+        listSize!!.forEach { size ->
+            Log.d("vito_log", "preview-> width: " + size.width.toString() + " height: " + size.height.toString())
+        }
 
         p.setPreviewSize(mPreviewSize.width, mPreviewSize.height)
-        p.previewFormat = PixelFormat.YCbCr_420_SP
+        p.previewFormat = PixelFormat.YCbCr_420_SP // todo try ImageFormat.NV21
         mServiceCamera?.parameters = p
 
         try {
-            mServiceCamera?.setDisplayOrientation(0)
+            mServiceCamera?.setDisplayOrientation(90)
             mServiceCamera?.setPreviewDisplay(mSurfaceHolder)
             mServiceCamera?.startPreview()
 
             Log.d("vito_log", "started preview very good")
 
             mServiceCamera?.setPreviewCallback { data, camera ->
-                frameCount++ // fuck you frame count
                 if(readyToProcessNextFrame){    //if (frameCount >= 10){ // the IF
-                    Log.d("vito_log", "got camera data, size: ${data.size}")
-                    readyToProcessNextFrame = false
-                    frameCount = 0
+                    //Log.d("vito_log", "got camera data, size: ${data.size}")
+                    runOnBackgroundThread(
+                        Runnable{
+                            readyToProcessNextFrame = false
+                            frameCount = 0
 
-                    if(data == null || data.isEmpty()) {
-                        throw java.lang.RuntimeException()
-                    }
+                            if(data == null || data.isEmpty()) {
+                                throw java.lang.RuntimeException()
+                            }
 
-                    val aprams = camera.parameters
-                    val iwdth = aprams.previewSize.width
-                    val ehight = aprams.previewSize.height
+                            val aprams = camera.parameters
+                            val iwdth = aprams.previewSize.width
+                            val ehight = aprams.previewSize.height
 
-                    val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
-                    val out = ByteArrayOutputStream()
-                    yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
+                            val img = InputImage.fromByteArray(
+                                data,
+                                iwdth,
+                                ehight,
+                                270,
+                                InputImage.IMAGE_FORMAT_NV21 // or IMAGE_FORMAT_YV12
+                            )
 
-                    val bytes = out.toByteArray()
+/*
+                            val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
+                            val out = ByteArrayOutputStream()
+                            yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
 
-                    val img = decodeByteArray(bytes, 0, bytes.size)
+                            val bytes = out.toByteArray()
 
-                    //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
-//                    cameraImageView?.setImageBitmap(img)
+                            val img = decodeByteArray(bytes, 0, bytes.size).rotate(270F)
+*/
+                            //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
+                            // cameraImageView?.setImageBitmap(img)
 
-                    if(img != null) {
 
-                        Log.i("FACE", img.toString())
-                        val image = InputImage.fromBitmap(img, 0)
-                        Log.i("FACE", image.height.toString() + image.width.toString())
-                        Log.i("FACE", image.toString())
-                        var res = detector.process(image)
-                            .addOnSuccessListener { faces ->
+                            if(img != null) {
 
-                                Log.d("FACE", faces.size.toString())
-                                if(faces.size > 0){
+                                //val image = InputImage.fromBitmap(img, 0)
+                                //Log.i("FACE", image.height.toString() + image.width.toString())
+                                //Log.i("FACE", image.toString())
+                                var res = detector.process(img) // was image !!! todo
+                                    .addOnSuccessListener { faces ->
+
+                                        Log.d("FACE", faces.size.toString())
+                                        if(faces.size > 0){
 //                    listener(FaceOrientation(faces[0].headEulerAngleY, faces[0].headEulerAngleZ))
 
-                                    // https://developers.google.com/ml-kit/vision/face-detection/android
+                                            // https://developers.google.com/ml-kit/vision/face-detection/android
 
-                                    Log.d("vito_log", "more than 0 faces")
-                                    readyToProcessNextFrame = true
-                                } else {
-                                    Log.d("vito_log", "<= 0 faces")
-                                    readyToProcessNextFrame = true
-                                }
+                                            Log.d("vito_log", "more than 0 faces-> X: ${faces[0].headEulerAngleX}, Y: ${faces[0].headEulerAngleY}, Z: ${faces[0].headEulerAngleZ}")
+                                            pitch = -1*faces[0].headEulerAngleX
+                                            roll = faces[0].headEulerAngleZ
+                                            readyToProcessNextFrame = true
+                                        } else {
+                                            Log.d("vito_log", "<= 0 faces")
+//
+                                            readyToProcessNextFrame = true
+                                        }
 //                        faces[0].headEulerAngleY
 
+                                    }
+                                    .addOnFailureListener { e ->
+                                        Log.d("FACE", "error boy: $e")
+                                    }
+                            } else {
+                                Log.d("vito_log", "cant decode image")
                             }
-                            .addOnFailureListener { e ->
-                                Log.d("FACE", "error boy: $e")
-                            }
-                    } else {
-                        Log.d("vito_log", "cant decode image")
-                    }
+                        }
+                    )
+
 
                 } // the if for the frame count
 
@@ -259,6 +278,13 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         // TODO try this, use reconnect to reclaim camera, check docs
 //        mServiceCamera?.unlock()
+    }
+
+    fun Bitmap.rotate(degrees: Float): Bitmap{
+        val matrix = Matrix().apply {
+            postRotate(degrees)
+        }
+        return Bitmap.createBitmap(this, 0,0,width,height,matrix,true)
     }
 
 
@@ -301,7 +327,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         val callback = object : AccessibilityService.GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription) {
                 super.onCompleted(gestureDescription)
-                Log.d("vito_log", "gesture completed")
+                //Log.d("vito_log", "gesture completed")
             }
 
             override fun onCancelled(gestureDescription: GestureDescription) {
@@ -310,14 +336,15 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
             }
         }
 
+        // todo remove thiss????????????????????
         backgroundThreadScheduler.scheduleAtFixedRate({
             // TODO can this execute on background thread?
             mainThreadHandler.post {
 //                Log.i("vito_log", "uso u run")
                 if (isCursorActivated) {
                     pointerLast = pointer.copy()
-                    pointer.translateCommands(roll, pitch)
-
+//                    pointer.translateCommands(roll, pitch)
+                    pointer.translateCommandsCamera(roll, pitch)
                     movePointer(pointer)
 
                     if (pointer.x == pointerLast.x && pointer.y == pointerLast.y) {
@@ -331,7 +358,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                                     pointer.y.toFloat() + screenHeight / 2 - 1
                                 ), callback, null
                             ) //bitno
-                            Log.i("vito_log", "result:   " + res.toString())
+                            //Log.i("vito_log", "result:   " + res.toString())
                         }
                     } else {
                         clickTimer = 0
@@ -631,7 +658,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         layoutParamsCameraView.height = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsCameraView.gravity = Gravity.START
         layoutParamsCameraView.x = 0
-        layoutParamsCameraView.y = screenHeight / 2
+        layoutParamsCameraView.y = -1*screenHeight / 2
         mLayoutCameraView.visibility = INVISIBLE
 
         val inflater = LayoutInflater.from(this)
@@ -710,7 +737,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
             mSurfaceView = mLayoutCameraView.findViewById(R.id.camera_view_surface_view)
 
             //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
-            //cameraImageView = mLayoutCameraView.findViewById(R.id.camera_view_image_view)
+//            cameraImageView = mLayoutCameraView.findViewById(R.id.camera_view_image_view)
 
             mSurfaceHolder = mSurfaceView?.holder
             mSurfaceHolder?.addCallback(this)
