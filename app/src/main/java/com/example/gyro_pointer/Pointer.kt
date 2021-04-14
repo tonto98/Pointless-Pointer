@@ -8,8 +8,8 @@ private val screenWidth: Int = Resources.getSystem().displayMetrics.widthPixels
 private const val factor: Int = 5
 private const val cameraFactor: Int = 8
 
-private const val X_THRESHOLD = 8
-private const val Y_THRESHOLD = 8
+private const val X_THRESHOLD = 6
+private const val Y_THRESHOLD = 6
 
 class Pointer(x: Int = 5, y: Int = 5) {
 
@@ -72,12 +72,12 @@ class Pointer(x: Int = 5, y: Int = 5) {
           }
       }
 
-      if (pitch > Y_THRESHOLD+2){
+      if (pitch > Y_THRESHOLD+3){
           if (y < screenHeight/2){
               y += cameraFactor
           }
       }
-      else if (pitch < -Y_THRESHOLD-3){
+      else if (pitch < -Y_THRESHOLD+4){
           if (y > (-1* screenHeight)/2){
               y -= cameraFactor
           }

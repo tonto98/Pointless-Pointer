@@ -18,6 +18,7 @@ import android.view.*
 import android.view.View.INVISIBLE
 import android.view.View.VISIBLE
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
@@ -80,6 +81,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
     private lateinit var mLayoutCursor: FrameLayout
     private lateinit var mLayoutProgress: FrameLayout
+    private lateinit var mLayoutToggle: FrameLayout
     private lateinit var mLayoutCameraView: FrameLayout
     private lateinit var windowManager: WindowManager
     private lateinit var layoutParamsCursor: WindowManager.LayoutParams
@@ -107,6 +109,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     private var imageCapture: ImageCapture? = null
 
     lateinit var progressBar: ProgressBar
+    lateinit var toggleButton: Button
     private lateinit var detector: FaceDetector
     private var safeToCapture: Boolean = true
 
@@ -117,6 +120,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
     private var mSurfaceView: SurfaceView? = null
     private var mSurfaceHolder: SurfaceHolder? = null
+
 
     //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
     //private var cameraImageView: ImageView? = null
@@ -144,8 +148,18 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         initPointer()
         initProgressBar()
         initCameraView()
+        initToggler()
 
         progressBar = mLayoutProgress.findViewById(R.id.progressBar)
+        toggleButton = mLayoutToggle.findViewById(R.id.switch_cursor_toggle)
+        toggleButton.setOnClickListener {
+            isCursorActivated = !isCursorActivated
+            if(isCursorActivated){
+                showCursor()
+            }else{
+                hideCursor()
+            }
+        }
 
         startPointer()
 
@@ -179,11 +193,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         val p = mServiceCamera?.parameters
         val listSize = p?.supportedPreviewSizes
-        val mPreviewSize = listSize!![15]
+        val mPreviewSize = listSize!![13]
 
-        listSize!!.forEach { size ->
-            Log.d("vito_log", "preview-> width: " + size.width.toString() + " height: " + size.height.toString())
-        }
 
         p.setPreviewSize(mPreviewSize.width, mPreviewSize.height)
         p.previewFormat = PixelFormat.YCbCr_420_SP // todo try ImageFormat.NV21
@@ -219,19 +230,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
                                 270,
                                 InputImage.IMAGE_FORMAT_NV21 // or IMAGE_FORMAT_YV12
                             )
-
-/*
-                            val yuvImg = YuvImage(data, aprams.previewFormat, iwdth, ehight, null)
-                            val out = ByteArrayOutputStream()
-                            yuvImg.compressToJpeg(Rect(0, 0, iwdth, ehight), 50, out)
-
-                            val bytes = out.toByteArray()
-
-                            val img = decodeByteArray(bytes, 0, bytes.size).rotate(270F)
-*/
-                            //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
-                            // cameraImageView?.setImageBitmap(img)
-
 
                             if(img != null) {
 
@@ -278,13 +276,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         // TODO try this, use reconnect to reclaim camera, check docs
 //        mServiceCamera?.unlock()
-    }
-
-    fun Bitmap.rotate(degrees: Float): Bitmap{
-        val matrix = Matrix().apply {
-            postRotate(degrees)
-        }
-        return Bitmap.createBitmap(this, 0,0,width,height,matrix,true)
     }
 
 
@@ -596,9 +587,12 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
     private fun createClick(x: Float, y: Float): GestureDescription {
         // for a single tap a duration of 1 ms is enough
         val DURATION = 1
-
+        mainThreadHandler.post{
+            Log.d("vito_log", "layout x: ${layoutParamsCursor.x} y: ${layoutParamsCursor.y}")
+            Log.d("vito_log", "kursor x: ${x} y: ${y}")
+        }
         val clickPath = Path()
-        clickPath.moveTo(x, y)
+        clickPath.moveTo(x, y+60) // +110 na y mi je kinda popravilo idk vidit cemo
         val clickStroke = GestureDescription.StrokeDescription(clickPath, 0, DURATION.toLong())
         val clickBuilder = GestureDescription.Builder()
         clickBuilder.addStroke(clickStroke)
@@ -645,6 +639,26 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         windowManager.addView(mLayoutProgress, layoutParamsProgress)
     }
 
+    private fun initToggler() {
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        mLayoutToggle = FrameLayout(this)
+        layoutParamsCursor = WindowManager.LayoutParams()
+        layoutParamsCursor.type = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        layoutParamsCursor.format = PixelFormat.TRANSLUCENT
+        layoutParamsCursor.flags =
+            layoutParamsCursor.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        layoutParamsCursor.width = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCursor.height = WindowManager.LayoutParams.WRAP_CONTENT
+        layoutParamsCursor.gravity = Gravity.START
+        layoutParamsCursor.x = screenWidth
+        layoutParamsCursor.y = -1*screenHeight/2
+        mLayoutToggle.visibility = VISIBLE
+
+        val inflater = LayoutInflater.from(this)
+        inflater.inflate(R.layout.toggle, mLayoutToggle)
+        windowManager.addView(mLayoutToggle, layoutParamsCursor)
+    }
+
     private fun initCameraView() {
 
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -658,7 +672,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         layoutParamsCameraView.height = WindowManager.LayoutParams.WRAP_CONTENT
         layoutParamsCameraView.gravity = Gravity.START
         layoutParamsCameraView.x = 0
-        layoutParamsCameraView.y = -1*screenHeight / 2
+        layoutParamsCameraView.y = (screenHeight/2) -270
         mLayoutCameraView.visibility = INVISIBLE
 
         val inflater = LayoutInflater.from(this)
@@ -721,6 +735,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         thread.start()
     }
 
+    var isCameraInitialized: Boolean = false
     private fun showCursor() {
         mLayoutCursor.visibility = VISIBLE
         windowManager.updateViewLayout(mLayoutCursor, layoutParamsCursor)
@@ -731,6 +746,9 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
         mLayoutCameraView.visibility = VISIBLE
         windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
 
+        if (!isCameraInitialized){
+
+        }
         mainThreadHandler.post {
 //            mServiceCamera = Camera.open()
             mServiceCamera = getAvailableFrontCamera()
@@ -751,6 +769,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
             // FRONT CAMERA NOT WORKING WITH ML KIT ALSO I HAVE SERIOUS DEPRESSION
             // https://stackoverflow.com/questions/63050697/mlkit-face-detection-not-working-with-front-camera-for-android
         }
+
     }
 
     private fun hideCursor() {
@@ -762,7 +781,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener, Came
 
         mLayoutCameraView.visibility = INVISIBLE
         windowManager.updateViewLayout(mLayoutCameraView, layoutParamsCameraView)
-        mServiceCamera?.release()
+        //mServiceCamera?.release()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
