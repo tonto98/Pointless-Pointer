@@ -46,18 +46,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
     private val mainThreadHandler = Handler(Looper.getMainLooper())
     private val backgroundThreadHandler = Executors.newSingleThreadExecutor()
 
-
-    // this is an example
-    init {
-        mainThreadHandler.post {
-            // ovo na main threadu
-        }
-
-        backgroundThreadHandler.submit {
-            // ovo se na main threadu izvrsava
-        }
-    }
-
     fun runOnMainThread(runnable: Runnable) {
         mainThreadHandler.post(runnable)
     }
