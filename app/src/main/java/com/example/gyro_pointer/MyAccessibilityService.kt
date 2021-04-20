@@ -32,7 +32,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-class MyAccessibilityService : AccessibilityService(), SensorEventListener,
+class MyAccessibilityService : AccessibilityService(),
     SurfaceHolder.Callback {
 
     companion object {
@@ -81,24 +81,15 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
     private lateinit var sensorManager: SensorManager
     private var mLight: Sensor? = null
 
-    private var imageCapture: ImageCapture? = null
-
     lateinit var progressBar: ProgressBar
     lateinit var toggleButton: Button
     private lateinit var detector: FaceDetector
-    private var safeToCapture: Boolean = true
 
-    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val backgroundThreadScheduler = Executors.newScheduledThreadPool(3)
 
-    private var mCamera: Camera? = null
 
     private var mSurfaceView: SurfaceView? = null
     private var mSurfaceHolder: SurfaceHolder? = null
-
-
-    //imageview koj je sluzio za skuzit koj kurac krasni se desava sa rotacijom
-    //private var cameraImageView: ImageView? = null
 
     override fun onInterrupt() {
         Log.i("vito_log", "onInterrupt() called")
@@ -110,14 +101,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
     }
 
     private fun initShit() {
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        mLight = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-
-        mLight?.also { light ->
-            Log.i("vito_log", "register listener")
-            sensorManager.registerListener(this, light, SensorManager.SENSOR_DELAY_NORMAL)
-        }
-
         Log.i("vito_log", "H: " + screenHeight + " W: " + screenWidth)
 
         initPointer()
@@ -269,7 +252,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
                     if (pointer.x == pointerLast.x && pointer.y == pointerLast.y) {
                         clickTimer += 2
                         progressBar.progress = clickTimer
-                        if (clickTimer == 90) {
+                        if (clickTimer == 68) {
                             clickTimer = 0
                             val res: Boolean = dispatchGesture(
                                 createClick(
@@ -311,23 +294,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
         }
         return cam
     }
-
-    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        // Do something here if sensor accuracy changes.
-        Log.i("MainServiceSensor", "accuracy changed to: " + accuracy.toString())
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        // The light sensor returns a single value.
-        // Many sensors return 3 values, one for each axis.
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
-        // Do something with this sensor value.
-        // todo uncomment if you want to see x y z values
-//        Log.i("MainServiceSensor", x.roundToInt().toString() + " " + y.roundToInt().toString() + " " + z.roundToInt().toString())
-    }
-
 
     override fun onAccessibilityEvent(p0: AccessibilityEvent?) {
         Log.i("MainService", "onAccessibilityEvent() called")
