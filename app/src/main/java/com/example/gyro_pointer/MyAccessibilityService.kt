@@ -134,17 +134,19 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
         backgroundThreadScheduler.scheduleAtFixedRate({
             // TODO can this execute on background thread?
             mainThreadHandler.post {
-//                Log.i("vito_log", "uso u run")
+                //Log.i("vito_log", "uso u run")
                 if (isCursorActivated) {
                     pointerLast = pointer.copy()
 //                    pointer.translateCommands(roll, pitch)
-                    pointer.translateCommandsCamera(roll, pitch)
+//                    pointer.translateCommandsCamera(roll, pitch)
+                    pointer.translateCommandsMagnet(roll.toInt(), pitch.toInt())
                     movePointer(pointer)
 
-                    if (pointer.x == pointerLast.x && pointer.y == pointerLast.y) {
+                    if ((pointer.x >= pointerLast.x -1 && pointer.x <= pointerLast.x +1) &&
+                        (pointer.y >= pointerLast.y -1 && pointer.y <= pointerLast.y +1)) {
                         clickTimer += 2
                         progressBar.progress = clickTimer
-                        if (clickTimer == 90) {
+                        if (clickTimer == 68) {
                             clickTimer = 0
                             val res: Boolean = dispatchGesture(
                                 createClick(
@@ -179,6 +181,8 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
         val z = event.values[2]
         // Do something with this sensor value.
         Log.i("MainServiceSensor", x.roundToInt().toString() + " " + y.roundToInt().toString() + " " + z.roundToInt().toString())
+        roll = x
+        pitch = y
     }
 
 

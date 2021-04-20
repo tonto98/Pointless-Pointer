@@ -18,7 +18,7 @@ private const val Y_THRESHOLD = 6
 val points = arrayListOf<Point>(
     Point(-7, -115), Point(29, -121), Point(48, -90),
     Point(0, -81), Point(22, -80), Point(30, -66),
-    Point(6, -62), Point(15, -60), Point(22, -56)
+    Point(6, -62), Point(15, -60), Point(24, -56)
 )
 
 class Pointer(x: Int = 5, y: Int = 5) {
@@ -114,6 +114,10 @@ class Pointer(x: Int = 5, y: Int = 5) {
         }
 
         Log.d("Pointer", "minimum distance is $minDistance, index: $minIndex")
+
+        if(minDistance > 18 && minIndex == 8) return
+
+        //return
 
         when (minIndex){
 

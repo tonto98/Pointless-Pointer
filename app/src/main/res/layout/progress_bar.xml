@@ -11,7 +11,7 @@
             android:layout_width="411dp"
             android:layout_height="23dp"
             android:indeterminate="false"
-            android:max="100"
+            android:max="68"
             android:minWidth="200dp"
             android:minHeight="50dp"
             android:progress="1" />
