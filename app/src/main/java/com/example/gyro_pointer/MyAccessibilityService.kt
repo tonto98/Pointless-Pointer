@@ -7,10 +7,6 @@ import android.content.Intent
 import android.content.res.Resources
 import android.graphics.Path
 import android.graphics.PixelFormat
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -30,9 +26,9 @@ import java.io.InputStreamReader
 import java.net.ServerSocket
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import kotlin.math.roundToInt
+import kotlin.concurrent.thread
 
-class MyAccessibilityService : AccessibilityService(), SensorEventListener,
+class MyAccessibilityService : AccessibilityService(),
     SurfaceHolder.Callback {
 
     private val mainThreadHandler = Handler(Looper.getMainLooper())
@@ -59,9 +55,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
 
     private var isCursorActivated: Boolean = false
 
-    private lateinit var sensorManager: SensorManager
-    private var mMagnet: Sensor? = null
-
     lateinit var progressBar: ProgressBar
     lateinit var toggleButton: Button
 
@@ -77,15 +70,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
     }
 
     private fun initShit() {
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        mMagnet = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD)
-
-
-        mMagnet?.also { light ->
-            Log.i("vito_log", "register listener")
-            sensorManager.registerListener(this, light, SensorManager.SENSOR_DELAY_GAME)
-        }
-
         Log.i("vito_log", "H: " + screenHeight + " W: " + screenWidth)
 
         initPointer()
@@ -104,6 +88,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
         }
 
         startPointer()
+        startServer()
 
     }
 
@@ -139,7 +124,7 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
                     pointerLast = pointer.copy()
 //                    pointer.translateCommands(roll, pitch)
 //                    pointer.translateCommandsCamera(roll, pitch)
-                    pointer.translateCommandsMagnet(roll.toInt(), pitch.toInt())
+                    pointer.translateCommandsHelmet(roll, pitch)
                     movePointer(pointer)
 
                     if ((pointer.x >= pointerLast.x -1 && pointer.x <= pointerLast.x +1) &&
@@ -167,24 +152,6 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
             }
         }, 0, 30L, TimeUnit.MILLISECONDS)
     }
-
-    override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {
-        // Do something here if sensor accuracy changes.
-        Log.i("MainServiceSensor", "accuracy changed to: " + accuracy.toString())
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        // The light sensor returns a single value.
-        // Many sensors return 3 values, one for each axis.
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
-        // Do something with this sensor value.
-        Log.i("MainServiceSensor", x.roundToInt().toString() + " " + y.roundToInt().toString() + " " + z.roundToInt().toString())
-        roll = x
-        pitch = y
-    }
-
 
     override fun onAccessibilityEvent(p0: AccessibilityEvent?) {
         Log.i("MainService", "onAccessibilityEvent() called")
@@ -295,33 +262,38 @@ class MyAccessibilityService : AccessibilityService(), SensorEventListener,
 
 
     private fun startServer() {
-        val thread = Thread(object : Runnable {
-            override fun run() {
-                try {
-                    Log.i("MainService", "uso u try")
-                    val sSocket = ServerSocket(9001)
-                    val s = sSocket.accept()
+        val thread = Thread(Runnable {
+            try {
+                Log.i("MainService", "uso u try")
+                val sSocket = ServerSocket(9001)
+                val s = sSocket.accept()
 
-                    var input: BufferedReader
+                var input: BufferedReader
 
-                    while (true) {
-                        Log.i("MainService", "uso u while")
-                        input = BufferedReader(InputStreamReader(s.getInputStream()))
-                        inputData = input.readLine()
-                        Log.i("MainService", inputData)
-                        val command = inputData!!.split(" ")
-                        pitch = command[0].toFloat() //mozda obrnuto !!
-                        roll = command[1].toFloat() //mozda obrnuto !!
-                        //movePointer()
+                while (true) {
+                    Log.i("MainService", "uso u while")
+                    input = BufferedReader(InputStreamReader(s.getInputStream()))
+                    inputData = input.readLine()
+                    if(inputData == null){
+                        Log.d("MainService", "input data is null, stopping?")
+                        s.close()
+                        sSocket.close()
+                        break
                     }
-
-                    //                    s.close()
-                    //                    sSocket.close()
-
-                } catch (e: IOException) {
-                    Log.i("MainService", "uso u catch " + e.toString())
-                    e.printStackTrace()
+                    Log.i("MainService", inputData)
+                    val command = inputData!!.split(" ")
+                    pitch = command[0].toFloat() //mozda obrnuto !!
+                    roll = command[1].toFloat() //mozda obrnuto !!
+                    //movePointer()
+                    Thread.sleep(10)
                 }
+
+                //                    s.close()
+                //                    sSocket.close()
+
+            } catch (e: IOException) {
+                Log.i("MainServiceERROR", "uso u catch " + e.toString())
+                e.printStackTrace()
             }
         })
         thread.start()

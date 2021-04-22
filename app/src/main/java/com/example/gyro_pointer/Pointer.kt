@@ -63,8 +63,6 @@ class Pointer(x: Int = 5, y: Int = 5) {
                 y -= factor*2
             }
         }
-
-
     }
 
     fun copy(x: Int = this.x, y: Int = this.y) = Pointer(x, y)
@@ -166,6 +164,28 @@ class Pointer(x: Int = 5, y: Int = 5) {
             this.y = (-1* screenHeight)/2
         }
 
+    }
+
+    fun translateCommandsHelmet(roll: Float, pitch: Float){
+        if (roll < -1.5){
+            if (x > 5){
+                x -= factor
+            }
+        }else if (roll > 1.5){
+            if (x < screenWidth-5){
+                x += factor
+            }
+        }
+
+        if (pitch < -1.5){
+            if (y < screenHeight/2){
+                y += factor
+            }
+        }else if (pitch > 1.5){
+            if (y > (-1* screenHeight)/2){
+                y -= factor
+            }
+        }
     }
 
 }
